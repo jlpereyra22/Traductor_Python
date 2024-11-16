@@ -33,8 +33,13 @@ def translate_text(text, src='en', dest='es'):
 def create_pdf_from_text(text, output_path):
     pdf = FPDF()
     pdf.add_page()
+    
+    # Registrar la fuente desde la carpeta 'fuentes'
+    font_path = os.path.join(os.getcwd(), 'fuentes', 'Roboto-BoldItalic.ttf')  # Ruta del archivo TTF descargado
+    pdf.add_font('NotoSans', '', font_path,)
+    pdf.set_font('NotoSans', '', 12)  # Establecer la fuente a 'Noto Sans'
+    
     pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_font('Arial', '', 12)
     pdf.multi_cell(0, 10, text)
     pdf.ln()
     pdf.output(output_path)
@@ -120,5 +125,3 @@ btn_start.grid(row=2, column=1, padx=10, pady=20)
 
 # Ejecutar la aplicación
 root.mainloop()
-
-
