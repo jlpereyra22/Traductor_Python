@@ -1,84 +1,53 @@
 import os
-import PyPDF2
+import fitz  # PyMuPDF
 from deep_translator import GoogleTranslator
-from fpdf import FPDF
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-# Función para extraer texto de un PDF entre dos páginas específicas
-def extract_text_from_pdf(pdf_path, start_page, end_page):
-    text = ""
-    with open(pdf_path, 'rb') as file:
-        reader = PyPDF2.PdfReader(file)
-        for page_num in range(start_page, end_page):
-            if page_num < len(reader.pages):
-                page = reader.pages[page_num]
-                text += page.extract_text()
-    return text
+# Función para extraer texto de un archivo PDF
+def extract_text_from_pdf(pdf_path):
+    try:
+        doc = fitz.open(pdf_path)
+        text = ""
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            text += page.get_text("text")  # Extracción de solo el texto de cada página
+        print("[INFO] Texto extraído del PDF con éxito.")
+        return text
+    except Exception as e:
+        print(f"[ERROR] Error al extraer texto del PDF: {e}")
+        return ""
 
-# Función para dividir el texto en partes más pequeñas
-def split_text(text, max_chars=3000):
-    return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
+# Función para guardar el texto extraído en un archivo .txt
+def save_text_to_txt(text, output_path):
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(text)
+        print(f"[INFO] Texto guardado exitosamente en {output_path}")
+    except Exception as e:
+        print(f"[ERROR] Error al guardar el archivo de texto: {e}")
 
-# Función para traducir texto usando deep-translator
+# Función para dividir el texto en partes de menos de 5000 caracteres
+def split_text(text, max_length=3000):
+    return [text[i:i + max_length] for i in range(0, len(text), max_length)]
+
+# Función para traducir el texto
 def translate_text(text, src='en', dest='es'):
-    translator = GoogleTranslator(source=src, target=dest)
-    parts = split_text(text, max_chars=3000)  # Ahora con un tamaño de 3000 caracteres
-    translated_text = ""
-    for part in parts:
-        translated_text += translator.translate(part) + " "  # Añadir un espacio entre las partes traducidas
-    return translated_text.strip()  # Eliminar espacios en blanco al final
-
-# Función para crear un PDF a partir de un texto
-def create_pdf_from_text(text, output_path):
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Registrar la fuente desde la carpeta 'fuentes'
-    font_path = os.path.join(os.getcwd(), 'fuentes', 'Roboto-BoldItalic.ttf')  # Ruta del archivo TTF descargado
-    pdf.add_font('NotoSans', '', font_path,)
-    pdf.set_font('NotoSans', '', 12)  # Establecer la fuente a 'Noto Sans'
-    
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.multi_cell(0, 10, text)
-    pdf.ln()
-    pdf.output(output_path)
-
-# Función para combinar múltiples PDFs en uno solo
-def combine_pdfs(pdf_list, output_path):
-    pdf_writer = PyPDF2.PdfWriter()
-    for pdf in pdf_list:
-        pdf_reader = PyPDF2.PdfReader(pdf)
-        for page_num in range(len(pdf_reader.pages)):
-            page = pdf_reader.pages[page_num]
-            pdf_writer.add_page(page)
-    with open(output_path, 'wb') as output_pdf:
-        pdf_writer.write(output_pdf)
-
-# Función principal que procesa el PDF en partes, traduce cada parte y crea PDFs parciales
-def process_pdf(pdf_path, output_dir):
-    chunk_size = 10
-    pdf_reader = PyPDF2.PdfReader(pdf_path)
-    num_pages = len(pdf_reader.pages)
-    pdf_chunks = []
-
-    # Procesar el PDF en partes de chunk_size páginas
-    for start_page in range(0, num_pages, chunk_size):
-        end_page = min(start_page + chunk_size, num_pages)
-        chunk_text = extract_text_from_pdf(pdf_path, start_page, end_page)
+    try:
+        translator = GoogleTranslator(source=src, target=dest)
+        translated_text = ""
         
-        # Traducción del texto extraído
-        translated_text = translate_text(chunk_text)
+        # Dividir el texto en partes si es necesario
+        text_parts = split_text(text)
         
-        # Guardar el texto traducido en un PDF
-        chunk_pdf_path = os.path.join(output_dir, f'chunk_{start_page // chunk_size + 1}.pdf')
-        create_pdf_from_text(translated_text, chunk_pdf_path)
-        pdf_chunks.append(chunk_pdf_path)
-
-    # Combinar todos los PDFs parciales en un único PDF final
-    final_pdf_path = os.path.join(output_dir, 'CompTIA_Security_plus_translated.pdf')
-    combine_pdfs(pdf_chunks, final_pdf_path)
-    messagebox.showinfo("Completado", f'PDF final traducido guardado en: {final_pdf_path}')
+        for part in text_parts:
+            translated_text += translator.translate(part) + " "
+        
+        print("[INFO] Texto traducido con éxito.")
+        return translated_text.strip()
+    except Exception as e:
+        print(f"[ERROR] Error al traducir el texto: {e}")
+        return ""
 
 # Función para seleccionar el archivo PDF
 def select_file():
@@ -94,18 +63,39 @@ def select_directory():
         entry_output_dir.delete(0, tk.END)
         entry_output_dir.insert(0, directory_path)
 
-# Función para iniciar el procesamiento del PDF
+# Función para iniciar el procesamiento (extracción, traducción y conversión a archivo .txt)
 def start_processing():
     pdf_path = entry_file_path.get()
     output_dir = entry_output_dir.get()
     if not pdf_path or not output_dir:
         messagebox.showerror("Error", "Por favor seleccione un archivo PDF y un directorio de salida.")
         return
-    process_pdf(pdf_path, output_dir)
+
+    # Extracción de texto
+    extracted_text = extract_text_from_pdf(pdf_path)
+    if not extracted_text:
+        messagebox.showerror("Error", "No se pudo extraer texto del PDF.")
+        return
+
+    # Guardar el texto extraído en un archivo .txt
+    output_txt_path = os.path.join(output_dir, 'Extracted_Output.txt')
+    save_text_to_txt(extracted_text, output_txt_path)
+
+    # Traducir el texto
+    translated_text = translate_text(extracted_text)
+    if not translated_text:
+        messagebox.showerror("Error", "No se pudo traducir el texto.")
+        return
+
+    # Guardar el texto traducido en un nuevo archivo .txt
+    translated_txt_path = os.path.join(output_dir, 'Translated_Output.txt')
+    save_text_to_txt(translated_text, translated_txt_path)
+
+    messagebox.showinfo("Completado", f'Texto traducido guardado exitosamente en: {translated_txt_path}')
 
 # Crear la ventana principal
 root = tk.Tk()
-root.title("Traductor de PDF")
+root.title("Conversor y Traductor de PDF a TXT")
 
 # Crear y colocar los widgets
 tk.Label(root, text="Archivo PDF:").grid(row=0, column=0, padx=10, pady=10)
