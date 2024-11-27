@@ -11,7 +11,8 @@ def extract_text_from_pdf(pdf_path):
         text = ""
         for page_num in range(len(doc)):
             page = doc.load_page(page_num)
-            text += page.get_text("text")  # Extracción de solo el texto de cada página
+            page_text = page.get_text("text")  # Extracción de solo el texto de cada página
+            text += page_text + "\n"  # Añadir un salto de línea para separar las páginas
         print("[INFO] Texto extraído del PDF con éxito.")
         return text
     except Exception as e:
@@ -27,9 +28,13 @@ def save_text_to_txt(text, output_path):
     except Exception as e:
         print(f"[ERROR] Error al guardar el archivo de texto: {e}")
 
-# Función para dividir el texto en partes de menos de 5000 caracteres
+# Función para dividir el texto en partes de menos de 3000 caracteres
 def split_text(text, max_length=3000):
-    return [text[i:i + max_length] for i in range(0, len(text), max_length)]
+    print("[DEBUG] Dividiendo el texto en partes.")
+    parts = [text[i:i + max_length] for i in range(0, len(text), max_length)]
+    for i, part in enumerate(parts):
+        print(f"[DEBUG] Parte {i+1}: {len(part)} caracteres")
+    return parts
 
 # Función para traducir el texto
 def translate_text(text, src='en', dest='es'):
@@ -40,8 +45,10 @@ def translate_text(text, src='en', dest='es'):
         # Dividir el texto en partes si es necesario
         text_parts = split_text(text)
         
-        for part in text_parts:
-            translated_text += translator.translate(part) + " "
+        for i, part in enumerate(text_parts):
+            translated_part = translator.translate(part)
+            print(f"[DEBUG] Traduciendo parte {i+1}/{len(text_parts)}: {len(part)} caracteres")
+            translated_text += translated_part + " "
         
         print("[INFO] Texto traducido con éxito.")
         return translated_text.strip()
